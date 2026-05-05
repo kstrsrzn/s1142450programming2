@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>垃圾分類手機 Web App</title>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4-alpha2/dist/teachablemachine-image.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4-alpha2/dist/teachablemachine-image.min.js"></script>
   <style>
     :root {
       color-scheme: light;
@@ -213,6 +213,11 @@
     let cameraReady = false;
 
     async function init() {
+      if (typeof tmImage === 'undefined') {
+        updateStatus("Teachable Machine 庫載入中，請稍候...");
+        setTimeout(init, 1000);
+        return;
+      }
       updateStatus("準備相機與模型...");
       captureBtn.disabled = true;
       await setupCamera();
@@ -248,6 +253,9 @@
     }
 
     async function loadModel() {
+      if (typeof tmImage === 'undefined') {
+        throw new Error("Teachable Machine 庫尚未載入完成");
+      }
       try {
         model = await tmImage.load(URL + "model.json", URL + "metadata.json");
         modelReady = true;
@@ -269,8 +277,8 @@
     }
 
     async function classifySnapshot() {
-      if (!model) {
-        updateStatus("模型尚未載入完成。");
+      if (!modelReady) {
+        updateStatus("模型尚未載入完成，請稍候再試。");
         return;
       }
       drawSnapshot();
