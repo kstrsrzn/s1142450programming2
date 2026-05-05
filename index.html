@@ -169,7 +169,7 @@
     <header class="app-header">
       <div>
         <h1>垃圾分類辨識</h1>
-        <p>使用手機相機拍照後自動判斷垃圾類別，手機畫面友善設計。</p>
+        <p>支援 GitHub Pages 與手機瀏覽器，拍照後直接辨識垃圾類別。</p>
       </div>
       <span class="status" id="status">載入中...</span>
     </header>
@@ -207,6 +207,7 @@
     const captureBtn = document.getElementById("captureBtn");
     const resetBtn = document.getElementById("resetBtn");
     const resultBox = document.getElementById("resultBox");
+    const origin = window.location.origin;
     const isHttpMode = window.location.protocol === "http:" || window.location.protocol === "https:";
     let model = null;
     let webcamStream = null;
@@ -260,7 +261,7 @@
         modelReady = true;
       } catch (error) {
         console.error("模型載入失敗", error);
-        updateStatus("模型載入失敗，請確認本機伺服器已啟動並由 http://127.0.0.1:8000/index.html 開啟。若仍失敗，請檢查 models 資料夾是否完整。");
+        updateStatus(`模型載入失敗，請確認頁面由網頁伺服器載入，例如 ${origin}/index.html 或 https://kstrsrzn.github.io/s1142450programming2/。若仍失敗，請檢查 models 資料夾是否完整。`);
         captureBtn.disabled = true;
       }
     }

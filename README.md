@@ -12,7 +12,13 @@
 4. 看到辨識結果與信心度
 
 > 建議使用本機伺服器開啟，例如 `python3 -m http.server`，以確保相機功能正常。瀏覽器直接開啟 `file://` 可能會被限制。
+### GitHub Pages
 
+此專案也可部署到 GitHub Pages，網址為：
+
+`https://kstrsrzn.github.io/s1142450programming2/`
+
+部署後請直接由此網址開啟，模型檔案會自動從 `models/` 資料夾載入。
 ### 專案結構
 
 - `index.html`：主要頁面
