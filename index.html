@@ -207,20 +207,12 @@
     const captureBtn = document.getElementById("captureBtn");
     const resetBtn = document.getElementById("resetBtn");
     const resultBox = document.getElementById("resultBox");
-    const origin = window.location.origin;
-    const isHttpMode = window.location.protocol === "http:" || window.location.protocol === "https:";
     let model = null;
     let webcamStream = null;
     let modelReady = false;
     let cameraReady = false;
 
     async function init() {
-      if (!isHttpMode) {
-        updateStatus("請透過 http:// 本機伺服器開啟頁面，不可直接使用 file://。");
-        captureBtn.disabled = true;
-        resultBox.innerHTML = `<p class="hint">請使用本機伺服器，例如 <code>python3 -m http.server</code>, 然後開啟 <strong>http://127.0.0.1:8000/index.html</strong></p>`;
-        return;
-      }
       updateStatus("準備相機與模型...");
       captureBtn.disabled = true;
       await setupCamera();
@@ -261,7 +253,8 @@
         modelReady = true;
       } catch (error) {
         console.error("模型載入失敗", error);
-        updateStatus(`模型載入失敗，請確認頁面由網頁伺服器載入，例如 ${origin}/index.html 或 https://kstrsrzn.github.io/s1142450programming2/。若仍失敗，請檢查 models 資料夾是否完整。`);
+        const errorMessage = error?.message || "未知錯誤";
+        updateStatus(`模型載入失敗：${errorMessage}。請確認此頁面與 models 資料夾同目錄，且直接以純靜態方式開啟。若仍失敗，請檢查 models 資料夾是否完整。`);
         captureBtn.disabled = true;
       }
     }
