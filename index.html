@@ -197,12 +197,20 @@
     const resetBtn = document.getElementById("resetBtn");
     const uploadInput = document.getElementById("uploadInput");
     const resultBox = document.getElementById("resultBox");
+    const isHttpMode = window.location.protocol === "http:" || window.location.protocol === "https:";
     let model = null;
     let webcamStream = null;
     let modelReady = false;
     let cameraReady = false;
 
     async function init() {
+      if (!isHttpMode) {
+        updateStatus("請透過 http:// 本機伺服器開啟頁面，不可直接使用 file://。");
+        uploadInput.disabled = true;
+        captureBtn.disabled = true;
+        resultBox.innerHTML = `<p class="hint">請使用本機伺服器，例如 <code>python3 -m http.server</code>, 然後開啟 <strong>http://127.0.0.1:8000/index.html</strong></p>`;
+        return;
+      }
       updateStatus("準備相機與模型...");
       uploadInput.disabled = true;
       captureBtn.disabled = true;
@@ -247,7 +255,7 @@
         modelReady = true;
       } catch (error) {
         console.error("模型載入失敗", error);
-        updateStatus("模型載入失敗，請確認 models 資料夾是否完整。");
+        updateStatus("模型載入失敗，請確認本機伺服器已啟動並由 http://127.0.0.1:8000/index.html 開啟。若仍失敗，請檢查 models 資料夾是否完整。");
         captureBtn.disabled = true;
         uploadInput.disabled = true;
       }
