@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>垃圾分類手機 Web App</title>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4-alpha2/dist/teachablemachine-image.min.js" defer></script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Noto Sans TC", system-ui, sans-serif;
+      background: #f0f4f8;
+      color: #102a43;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #e2ebf7 0%, #f8fafc 100%);
+    }
+    .app-shell {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .app-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .app-header h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+    }
+    .app-header p {
+      margin: 0;
+      line-height: 1.6;
+      color: #334e68;
+    }
+    .status {
+      white-space: nowrap;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #ffffff;
+      border: 1px solid #d9e2ec;
+      color: #102a43;
+      font-size: 0.95rem;
+    }
+    .camera-card,
+    .result-card {
+      background: #ffffff;
+      border: 1px solid #d9e2ec;
+      border-radius: 24px;
+      padding: 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 18px 30px rgba(16, 42, 67, 0.06);
+    }
+    .video-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #000;
+    }
+    video,
+    canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .hidden {
+      display: none;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 14px 20px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    button:hover,
+    button:focus-visible {
+      transform: translateY(-1px);
+    }
+    .primary-button {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+    }
+    .secondary-button {
+      background: #f8fafc;
+      color: #102a43;
+      border: 1px solid #cbd5e1;
+    }
+    .result-box {
+      min-height: 140px;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      border-radius: 18px;
+      background: #f8fafc;
+    }
+    .result-card h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    .result-item {
+      text-align: center;
+    }
+    .result-item strong {
+      display: block;
+      margin-top: 12px;
+      font-size: 1.8rem;
+      color: #1d4ed8;
+    }
+    .result-item span {
+      display: block;
+      margin-top: 6px;
+      color: #334e68;
+    }
+    footer {
+      text-align: center;
+      color: #486581;
+      font-size: 0.95rem;
+      padding: 14px 0 4px;
+    }
+    @media (max-width: 640px) {
+      .app-shell {
+        padding: 14px;
+      }
+      .app-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .status {
+        align-self: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <h1>垃圾分類辨識</h1>
+        <p>拍照或上傳圖片後自動判斷垃圾類別，手機畫面友善設計。</p>
+      </div>
+      <span class="status" id="status">載入中...</span>
+    </header>
+
+    <main>
+      <section class="camera-card">
+        <div class="video-frame">
+          <video id="webcam" autoplay playsinline muted></video>
+          <canvas id="snapshot" class="hidden"></canvas>
+        </div>
+        <div class="controls">
+          <button id="captureBtn" class="primary-button">拍照辨識</button>
+          <label for="uploadInput" class="secondary-button" id="uploadBtn">上傳圖片</label>
+          <input type="file" id="uploadInput" accept="image/*" class="hidden" />
+          <button id="resetBtn" class="secondary-button hidden">重新拍攝 / 重置</button>
+        </div>
+      </section>
+
+      <section class="result-card">
+        <h2>辨識結果</h2>
+        <div class="result-box" id="resultBox">
+          <p class="hint">請拍照或上傳圖片，然後按下「拍照辨識」或選擇圖片。</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>模型來源：models 資料夾內的 Teachable Machine 模型</p>
+    </footer>
+  </div>
+
+  <script>
+    const URL = "./models/";
+    const statusEl = document.getElementById("status");
+    const webcamEl = document.getElementById("webcam");
+    const snapshotEl = document.getElementById("snapshot");
+    const captureBtn = document.getElementById("captureBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const uploadInput = document.getElementById("uploadInput");
+    const resultBox = document.getElementById("resultBox");
+    let model = null;
+    let webcamStream = null;
+    let modelReady = false;
+    let cameraReady = false;
+
+    async function init() {
+      updateStatus("準備相機與模型...");
+      uploadInput.disabled = true;
+      captureBtn.disabled = true;
+      await setupCamera();
+      await loadModel();
+      if (modelReady) {
+        uploadInput.disabled = false;
+        if (cameraReady) {
+          captureBtn.disabled = false;
+        }
+        updateStatus("請拍照或上傳圖片進行辨識");
+      }
+    }
+
+    function updateStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    async function setupCamera() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        updateStatus("此裝置不支援相機功能。");
+        captureBtn.disabled = true;
+        return;
+      }
+      try {
+        webcamStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+          audio: false,
+        });
+        webcamEl.srcObject = webcamStream;
+        cameraReady = true;
+      } catch (error) {
+        console.error("相機開啟失敗", error);
+        updateStatus("無法開啟相機，請允許使用相機或改用支援的裝置。");
+        captureBtn.disabled = true;
+      }
+    }
+
+    async function loadModel() {
+      try {
+        model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+        modelReady = true;
+      } catch (error) {
+        console.error("模型載入失敗", error);
+        updateStatus("模型載入失敗，請確認 models 資料夾是否完整。");
+        captureBtn.disabled = true;
+        uploadInput.disabled = true;
+      }
+    }
+
+    function drawSnapshot() {
+      const videoWidth = webcamEl.videoWidth;
+      const videoHeight = webcamEl.videoHeight;
+      snapshotEl.width = videoWidth;
+      snapshotEl.height = videoHeight;
+      const context = snapshotEl.getContext("2d");
+      context.drawImage(webcamEl, 0, 0, videoWidth, videoHeight);
+    }
+
+    async function classifySnapshot() {
+      if (!model) {
+        updateStatus("模型尚未載入完成。");
+        return;
+      }
+      drawSnapshot();
+      snapshotEl.classList.remove("hidden");
+      webcamEl.classList.add("hidden");
+      captureBtn.classList.add("hidden");
+      resetBtn.classList.remove("hidden");
+      updateStatus("辨識中，請稍候...");
+      const predictions = await model.predict(snapshotEl);
+      showPrediction(predictions);
+    }
+
+    async function classifyUploadedFile(file) {
+      if (!modelReady) {
+        updateStatus("模型尚未載入完成，請稍候再試。");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = async () => {
+          const maxSide = Math.max(img.naturalWidth, img.naturalHeight);
+          const scale = Math.min(640 / maxSide, 1);
+          const width = img.naturalWidth * scale;
+          const height = img.naturalHeight * scale;
+          snapshotEl.width = width;
+          snapshotEl.height = height;
+          const ctx = snapshotEl.getContext("2d");
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          snapshotEl.classList.remove("hidden");
+          webcamEl.classList.add("hidden");
+          captureBtn.classList.add("hidden");
+          resetBtn.classList.remove("hidden");
+          updateStatus("辨識中，請稍候...");
+          const predictions = await model.predict(snapshotEl);
+          showPrediction(predictions);
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function showPrediction(predictions) {
+      if (!predictions || predictions.length === 0) {
+        resultBox.innerHTML = `<p class="hint">無法取得辨識結果，請重新拍照。</p>`;
+        updateStatus("請重新拍照。");
+        return;
+      }
+      const best = predictions.reduce((prev, current) => (current.probability > prev.probability ? current : prev));
+      const label = best.className;
+      const probability = Math.round(best.probability * 100);
+      resultBox.innerHTML = `
+        <div class="result-item">
+          <strong>${label}</strong>
+          <span>信心度：${probability}%</span>
+        </div>
+      `;
+      updateStatus("辨識完成！");
+    }
+
+    function resetView() {
+      snapshotEl.classList.add("hidden");
+      webcamEl.classList.remove("hidden");
+      captureBtn.classList.remove("hidden");
+      resetBtn.classList.add("hidden");
+      uploadInput.value = "";
+      resultBox.innerHTML = `<p class="hint">請拍照或上傳圖片進行辨識。</p>`;
+      updateStatus("請拍照或上傳圖片辨識垃圾類別");
+    }
+
+    captureBtn.addEventListener("click", classifySnapshot);
+    uploadInput.addEventListener("change", (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (file) {
+        classifyUploadedFile(file);
+      }
+    });
+    resetBtn.addEventListener("click", resetView);
+    window.addEventListener("load", init);
+  </script>
+</body>
+</html>
