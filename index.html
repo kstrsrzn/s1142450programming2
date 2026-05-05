@@ -18,9 +18,11 @@
     body {
       margin: 0;
       min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
       background: linear-gradient(180deg, #e2ebf7 0%, #f8fafc 100%);
     }
     .app-shell {
+      width: 100%;
       max-width: 780px;
       margin: 0 auto;
       padding: 16px;
@@ -90,6 +92,7 @@
       font-weight: 600;
       cursor: pointer;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
+      min-width: 0;
     }
     button:hover,
     button:focus-visible {
@@ -148,6 +151,16 @@
       .status {
         align-self: flex-start;
       }
+      .controls {
+        flex-direction: column;
+      }
+      .primary-button,
+      .secondary-button {
+        width: 100%;
+      }
+      .result-box {
+        min-height: 180px;
+      }
     }
   </style>
 </head>
@@ -156,7 +169,7 @@
     <header class="app-header">
       <div>
         <h1>垃圾分類辨識</h1>
-        <p>拍照或上傳圖片後自動判斷垃圾類別，手機畫面友善設計。</p>
+        <p>使用手機相機拍照後自動判斷垃圾類別，手機畫面友善設計。</p>
       </div>
       <span class="status" id="status">載入中...</span>
     </header>
@@ -169,8 +182,6 @@
         </div>
         <div class="controls">
           <button id="captureBtn" class="primary-button">拍照辨識</button>
-          <label for="uploadInput" class="secondary-button" id="uploadBtn">上傳圖片</label>
-          <input type="file" id="uploadInput" accept="image/*" class="hidden" />
           <button id="resetBtn" class="secondary-button hidden">重新拍攝 / 重置</button>
         </div>
       </section>
@@ -178,7 +189,7 @@
       <section class="result-card">
         <h2>辨識結果</h2>
         <div class="result-box" id="resultBox">
-          <p class="hint">請拍照或上傳圖片，然後按下「拍照辨識」或選擇圖片。</p>
+          <p class="hint">請拍照，然後按下「拍照辨識」。</p>
         </div>
       </section>
     </main>
@@ -195,7 +206,6 @@
     const snapshotEl = document.getElementById("snapshot");
     const captureBtn = document.getElementById("captureBtn");
     const resetBtn = document.getElementById("resetBtn");
-    const uploadInput = document.getElementById("uploadInput");
     const resultBox = document.getElementById("resultBox");
     const isHttpMode = window.location.protocol === "http:" || window.location.protocol === "https:";
     let model = null;
@@ -206,22 +216,17 @@
     async function init() {
       if (!isHttpMode) {
         updateStatus("請透過 http:// 本機伺服器開啟頁面，不可直接使用 file://。");
-        uploadInput.disabled = true;
         captureBtn.disabled = true;
         resultBox.innerHTML = `<p class="hint">請使用本機伺服器，例如 <code>python3 -m http.server</code>, 然後開啟 <strong>http://127.0.0.1:8000/index.html</strong></p>`;
         return;
       }
       updateStatus("準備相機與模型...");
-      uploadInput.disabled = true;
       captureBtn.disabled = true;
       await setupCamera();
       await loadModel();
-      if (modelReady) {
-        uploadInput.disabled = false;
-        if (cameraReady) {
-          captureBtn.disabled = false;
-        }
-        updateStatus("請拍照或上傳圖片進行辨識");
+      if (modelReady && cameraReady) {
+        captureBtn.disabled = false;
+        updateStatus("請拍照進行辨識");
       }
     }
 
@@ -257,7 +262,6 @@
         console.error("模型載入失敗", error);
         updateStatus("模型載入失敗，請確認本機伺服器已啟動並由 http://127.0.0.1:8000/index.html 開啟。若仍失敗，請檢查 models 資料夾是否完整。");
         captureBtn.disabled = true;
-        uploadInput.disabled = true;
       }
     }
 
@@ -285,36 +289,6 @@
       showPrediction(predictions);
     }
 
-    async function classifyUploadedFile(file) {
-      if (!modelReady) {
-        updateStatus("模型尚未載入完成，請稍候再試。");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = async () => {
-          const maxSide = Math.max(img.naturalWidth, img.naturalHeight);
-          const scale = Math.min(640 / maxSide, 1);
-          const width = img.naturalWidth * scale;
-          const height = img.naturalHeight * scale;
-          snapshotEl.width = width;
-          snapshotEl.height = height;
-          const ctx = snapshotEl.getContext("2d");
-          ctx.clearRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-          snapshotEl.classList.remove("hidden");
-          webcamEl.classList.add("hidden");
-          captureBtn.classList.add("hidden");
-          resetBtn.classList.remove("hidden");
-          updateStatus("辨識中，請稍候...");
-          const predictions = await model.predict(snapshotEl);
-          showPrediction(predictions);
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    }
 
     function showPrediction(predictions) {
       if (!predictions || predictions.length === 0) {
@@ -339,18 +313,11 @@
       webcamEl.classList.remove("hidden");
       captureBtn.classList.remove("hidden");
       resetBtn.classList.add("hidden");
-      uploadInput.value = "";
-      resultBox.innerHTML = `<p class="hint">請拍照或上傳圖片進行辨識。</p>`;
-      updateStatus("請拍照或上傳圖片辨識垃圾類別");
+      resultBox.innerHTML = `<p class="hint">請拍照，然後按下「拍照辨識」。</p>`;
+      updateStatus("請拍照辨識垃圾類別");
     }
 
     captureBtn.addEventListener("click", classifySnapshot);
-    uploadInput.addEventListener("change", (event) => {
-      const file = event.target.files && event.target.files[0];
-      if (file) {
-        classifyUploadedFile(file);
-      }
-    });
     resetBtn.addEventListener("click", resetView);
     window.addEventListener("load", init);
   </script>
